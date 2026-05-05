@@ -25,15 +25,25 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
+      - name: Prepare Android Properties
+        # 这次我们将属性写入 gradle.properties
+        # 这是 Gradle 脚本读取 project.property() 优先级最高的文件
+        run: |
+          mkdir -p simple_live_app/android
+          cat <<EOF > simple_live_app/android/gradle.properties
+          KEY_PATH=dummy
+          KEY_PASSWORD=dummy
+          ALIAS=dummy
+          ALIAS_PASSWORD=dummy
+          EOF
+          # 同时也复制一份到 local.properties 以防万一
+          cp simple_live_app/android/gradle.properties simple_live_app/android/local.properties
+
       - name: Build Debug APK
         run: |
           cd simple_live_app
-          # 通过 -P 参数直接注入 Gradle 属性，确保脚本中的变量不为 null
-          # 这样可以绕过 build.gradle.kts 里的类型转换报错
-          flutter build apk --debug --no-tree-shake-icons --dart-define=dummy=true \
-            --client-id-content=dummy \
-            --client-secret-content=dummy \
-            --gradle-switches="-PKEY_PATH=dummy -PKEY_PASSWORD=dummy -PALIAS=dummy -PALIAS_PASSWORD=dummy"
+          # 移除了之前报错的无效参数，只保留 Flutter 官方支持的命令
+          flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
