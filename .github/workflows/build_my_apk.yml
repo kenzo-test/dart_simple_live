@@ -25,17 +25,15 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Create local.properties
-        # 直接创建属性文件，填入 dummy 字符串
-        # 这样 Gradle 脚本在执行 (as String) 时会读到 "dummy" 而不是 null
-        run: |
-          printf "KEY_PATH=dummy\nKEY_PASSWORD=dummy\nALIAS=dummy\nALIAS_PASSWORD=dummy" > simple_live_app/android/local.properties
-
       - name: Build Debug APK
         run: |
           cd simple_live_app
-          # 编译 Debug 版，它会读取上面的属性文件但不会真的校验密钥有效性
-          flutter build apk --debug --no-tree-shake-icons
+          # 通过 -P 参数直接注入 Gradle 属性，确保脚本中的变量不为 null
+          # 这样可以绕过 build.gradle.kts 里的类型转换报错
+          flutter build apk --debug --no-tree-shake-icons --dart-define=dummy=true \
+            --client-id-content=dummy \
+            --client-secret-content=dummy \
+            --gradle-switches="-PKEY_PATH=dummy -PKEY_PASSWORD=dummy -PALIAS=dummy -PALIAS_PASSWORD=dummy"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
