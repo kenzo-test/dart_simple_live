@@ -25,22 +25,22 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Brute Force Patch Gradle
-        # 针对 image_f2f381.png 提到的 44 行报错进行暴力修复
-        # 我们直接把 build.gradle.kts 里面尝试读取 keystore 变量的代码行替换掉
+      - name: Create Fake Properties
+        # 针对 "null cannot be cast to non-null type kotlin.String" 的核心修复
+        # 我们直接在 android 目录下创建一个包含 dummy 值的属性文件
         run: |
-          FILE="simple_live_app/android/app/build.gradle.kts"
-          # 将所有尝试从 project 环境读取并转为 String 的操作替换为固定字符串 "dummy"
-          # 这能从根本上解决 "null cannot be cast to String" 的问题
-          sed -i 's/as String/"dummy"/g' $FILE
-          # 额外保险：把 signingConfigs 块内的逻辑清空
-          sed -i '/signingConfigs {/,/}/c\    signingConfigs { }' $FILE
-          # 确保 buildType 不再引用那些不存在的配置
-          sed -i 's/signingConfig =.*/signingConfig = null/g' $FILE
+          mkdir -p simple_live_app/android
+          cat <<EOF > simple_live_app/android/local.properties
+          KEY_PATH=dummy
+          KEY_PASSWORD=dummy
+          ALIAS=dummy
+          ALIAS_PASSWORD=dummy
+          EOF
 
       - name: Build Debug APK
         run: |
           cd simple_live_app
+          # 使用 debug 编译。因为有了上面的属性文件，Gradle 脚本可以读到字符串而不会崩溃
           flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
