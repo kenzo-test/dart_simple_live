@@ -1,4 +1,4 @@
-name: Build Mobile Optimized APK
+name: Build v8a Optimized APK
 on:
   workflow_dispatch:
 
@@ -25,23 +25,24 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Patch for Mobile Release
-        # 1. 修复 image_e8117b.png 中的 null 转换报错
-        # 2. 解决 image_e5489b.jpg 中的签名缺失问题，强制 Release 使用 Debug 签名
+      - name: Patch Gradle and Signing
+        # 1. 修复之前遇到的 null 转换错误
+        # 2. 强制 Release 模式借用 Debug 签名，绕过 keystore 缺失报错
         run: |
           FILE="simple_live_app/android/app/build.gradle.kts"
           sed -i 's/ as String/?.toString() ?: ""/g' $FILE
           sed -i 's/signingConfig = signingConfigs.getByName("release")/signingConfig = signingConfigs.getByName("debug")/g' $FILE
 
-      - name: Build Release APK
+      - name: Build v8a Release APK
         run: |
           cd simple_live_app
-          # 针对现代手机，我们不再拆分架构，直接打一个通用的 Release 包
-          # 这样你只需要下载一个文件，就能在绝大多数手机上运行
-          flutter build apk --release --no-tree-shake-icons
+          # --release: 启用代码压缩和混淆
+          # --split-per-abi: 触发架构拆分，减小单个 APK 体积
+          flutter build apk --release --no-tree-shake-icons --split-per-abi
 
-      - name: Upload Artifact
+      - name: Upload v8a Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-release-apk
-          path: simple_live_app/build/app/outputs/flutter-apk/app-release.apk
+          name: mobile-v8a-apk
+          # 仅上传 arm64-v8a 架构的安装包
+          path: simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
