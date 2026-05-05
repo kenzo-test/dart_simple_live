@@ -25,25 +25,22 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Setup Dummy Keys
-        # 不再删除代码，而是直接往系统环境里注入假的签名变量
-        # 这样 build.gradle.kts 就能读取到值，不会报 null 错误
+      - name: Brute Force Patch Gradle
+        # 针对 image_f2f381.png 提到的 44 行报错进行暴力修复
+        # 我们直接把 build.gradle.kts 里面尝试读取 keystore 变量的代码行替换掉
         run: |
-          echo "KEY_PATH=dummy" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=dummy" >> $GITHUB_ENV
-          echo "ALIAS=dummy" >> $GITHUB_ENV
-          echo "ALIAS_PASSWORD=dummy" >> $GITHUB_ENV
+          FILE="simple_live_app/android/app/build.gradle.kts"
+          # 将所有尝试从 project 环境读取并转为 String 的操作替换为固定字符串 "dummy"
+          # 这能从根本上解决 "null cannot be cast to String" 的问题
+          sed -i 's/as String/"dummy"/g' $FILE
+          # 额外保险：把 signingConfigs 块内的逻辑清空
+          sed -i '/signingConfigs {/,/}/c\    signingConfigs { }' $FILE
+          # 确保 buildType 不再引用那些不存在的配置
+          sed -i 's/signingConfig =.*/signingConfig = null/g' $FILE
 
       - name: Build Debug APK
-        env:
-          # 将上面定义的变量传递给编译环境
-          KEY_PATH: "dummy"
-          KEY_PASSWORD: "dummy"
-          ALIAS: "dummy"
-          ALIAS_PASSWORD: "dummy"
         run: |
           cd simple_live_app
-          # 编译 debug 版本，它实际上并不会真的去校验这些 key 的有效性
           flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
