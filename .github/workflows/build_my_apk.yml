@@ -1,4 +1,4 @@
-name: Build Smaller APK
+name: Build Mobile Optimized APK
 on:
   workflow_dispatch:
 
@@ -25,30 +25,23 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Generate Temporary Keystore
-        # 删除了那个报错的非法参数，现在是标准命令
-        run: |
-          cd simple_live_app/android
-          keytool -genkeypair -v -keystore upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown" -storepass 123456 -keypass 123456
-          echo "KEY_PATH=upload-keystore.jks" >> gradle.properties
-          echo "KEY_PASSWORD=123456" >> gradle.properties
-          echo "ALIAS=upload" >> gradle.properties
-          echo "ALIAS_PASSWORD=123456" >> gradle.properties
-
-      - name: Patch Gradle Script
-        # 继续沿用这个补丁，防止 Kotlin 类型强转报错
+      - name: Patch for Mobile Release
+        # 1. 修复 image_e8117b.png 中的 null 转换报错
+        # 2. 解决 image_e5489b.jpg 中的签名缺失问题，强制 Release 使用 Debug 签名
         run: |
           FILE="simple_live_app/android/app/build.gradle.kts"
           sed -i 's/ as String/?.toString() ?: ""/g' $FILE
+          sed -i 's/signingConfig = signingConfigs.getByName("release")/signingConfig = signingConfigs.getByName("debug")/g' $FILE
 
       - name: Build Release APK
         run: |
           cd simple_live_app
-          # 使用 --release 模式并按架构拆分
-          flutter build apk --release --no-tree-shake-icons --split-per-abi
+          # 针对现代手机，我们不再拆分架构，直接打一个通用的 Release 包
+          # 这样你只需要下载一个文件，就能在绝大多数手机上运行
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: smaller-apks
-          path: simple_live_app/build/app/outputs/flutter-apk/app-*-release.apk
+          name: mobile-release-apk
+          path: simple_live_app/build/app/outputs/flutter-apk/app-release.apk
