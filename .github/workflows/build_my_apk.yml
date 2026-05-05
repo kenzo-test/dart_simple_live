@@ -1,0 +1,39 @@
+name: Manual Build APK
+on:
+  workflow_dispatch: # 开启手动触发按钮
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # 自动抓取当前分支，不限制分支名
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: |
+          # 依次进入核心库和 App 目录安装依赖
+          cd simple_live_core && flutter pub get
+          cd ../simple_live_app && flutter pub get
+
+      - name: Build Debug APK
+        run: |
+          cd simple_live_app
+          # 使用 debug 模式跳过所有签名检查
+          flutter build apk --debug --no-tree-shake-icons
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-simple-live-apk
+          path: simple_live_app/build/app/outputs/flutter-apk/app-debug.apk
