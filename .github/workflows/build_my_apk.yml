@@ -25,24 +25,21 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Prepare Android Properties
-        # 这次我们将属性写入 gradle.properties
-        # 这是 Gradle 脚本读取 project.property() 优先级最高的文件
+      - name: Patch Gradle Script
+        # 针对 image_f203ba.png 中的第 44 行报错进行“外科手术”
+        # 这个命令会将代码中所有的 "as String"（强制转换）
+        # 替换为 "?.toString() ?: \"\""（安全转换，如果是 null 就给个空字符串）
+        # 这样 Gradle 脚本就能跑通，不再报类型转换错误
         run: |
-          mkdir -p simple_live_app/android
-          cat <<EOF > simple_live_app/android/gradle.properties
-          KEY_PATH=dummy
-          KEY_PASSWORD=dummy
-          ALIAS=dummy
-          ALIAS_PASSWORD=dummy
-          EOF
-          # 同时也复制一份到 local.properties 以防万一
-          cp simple_live_app/android/gradle.properties simple_live_app/android/local.properties
+          FILE="simple_live_app/android/app/build.gradle.kts"
+          sed -i 's/ as String/?.toString() ?: ""/g' $FILE
+          # 打印一下修改后的内容，方便我们在日志里确认是否修改成功
+          sed -n '40,50p' $FILE
 
       - name: Build Debug APK
         run: |
           cd simple_live_app
-          # 移除了之前报错的无效参数，只保留 Flutter 官方支持的命令
+          # 使用 debug 编译，跳过正式签名校验
           flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
