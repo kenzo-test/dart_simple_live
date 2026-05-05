@@ -1,4 +1,4 @@
-name: Manual Build APK
+name: Build Smaller APK
 on:
   workflow_dispatch:
 
@@ -25,25 +25,33 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
+      - name: Generate Temporary Keystore
+        # Release 模式强制要求签名，我们在这里现场造一个假的
+        run: |
+          cd simple_live_app/android
+          keytool -genkey -v -keystore upload-keystore.jks -allowsearchengine -alias upload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown" -storepass 123456 -keypass 123456
+          # 将签名信息写入 gradle.properties，喂给编译脚本
+          echo "KEY_PATH=upload-keystore.jks" >> gradle.properties
+          echo "KEY_PASSWORD=123456" >> gradle.properties
+          echo "ALIAS=upload" >> gradle.properties
+          echo "ALIAS_PASSWORD=123456" >> gradle.properties
+
       - name: Patch Gradle Script
-        # 针对 image_f203ba.png 中的第 44 行报错进行“外科手术”
-        # 这个命令会将代码中所有的 "as String"（强制转换）
-        # 替换为 "?.toString() ?: \"\""（安全转换，如果是 null 就给个空字符串）
-        # 这样 Gradle 脚本就能跑通，不再报类型转换错误
+        # 沿用之前的补丁，防止脚本因为变量类型报错
         run: |
           FILE="simple_live_app/android/app/build.gradle.kts"
           sed -i 's/ as String/?.toString() ?: ""/g' $FILE
-          # 打印一下修改后的内容，方便我们在日志里确认是否修改成功
-          sed -n '40,50p' $FILE
 
-      - name: Build Debug APK
+      - name: Build Release APK
         run: |
           cd simple_live_app
-          # 使用 debug 编译，跳过正式签名校验
-          flutter build apk --debug --no-tree-shake-icons
+          # --release: 开启优化，减小体积
+          # --split-per-abi: 将不同架构拆分成独立的 APK
+          flutter build apk --release --no-tree-shake-icons --split-per-abi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-simple-live-apk
-          path: simple_live_app/build/app/outputs/flutter-apk/app-debug.apk
+          name: smaller-apks
+          # 注意：路径变到了 release 文件夹下
+          path: simple_live_app/build/app/outputs/flutter-apk/app-*-release.apk
