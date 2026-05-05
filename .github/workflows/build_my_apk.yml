@@ -25,22 +25,16 @@ jobs:
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
 
-      - name: Create Fake Properties
-        # 针对 "null cannot be cast to non-null type kotlin.String" 的核心修复
-        # 我们直接在 android 目录下创建一个包含 dummy 值的属性文件
+      - name: Create local.properties
+        # 直接创建属性文件，填入 dummy 字符串
+        # 这样 Gradle 脚本在执行 (as String) 时会读到 "dummy" 而不是 null
         run: |
-          mkdir -p simple_live_app/android
-          cat <<EOF > simple_live_app/android/local.properties
-          KEY_PATH=dummy
-          KEY_PASSWORD=dummy
-          ALIAS=dummy
-          ALIAS_PASSWORD=dummy
-          EOF
+          printf "KEY_PATH=dummy\nKEY_PASSWORD=dummy\nALIAS=dummy\nALIAS_PASSWORD=dummy" > simple_live_app/android/local.properties
 
       - name: Build Debug APK
         run: |
           cd simple_live_app
-          # 使用 debug 编译。因为有了上面的属性文件，Gradle 脚本可以读到字符串而不会崩溃
+          # 编译 Debug 版，它会读取上面的属性文件但不会真的校验密钥有效性
           flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
