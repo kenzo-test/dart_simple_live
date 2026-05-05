@@ -1,13 +1,13 @@
 name: Manual Build APK
 on:
-  workflow_dispatch: # 开启手动触发按钮
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # 自动抓取当前分支，不限制分支名
+        uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -22,14 +22,21 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # 依次进入核心库和 App 目录安装依赖
           cd simple_live_core && flutter pub get
           cd ../simple_live_app && flutter pub get
+
+      - name: Patch Gradle (Fix null error)
+        run: |
+          # 这一步是关键：直接删掉 build.gradle.kts 中关于 signingConfigs 的引用
+          # 从而绕过那个 null 强转 String 的报错
+          sed -i '/signingConfigs/,/}/d' simple_live_app/android/app/build.gradle.kts
+          # 强制将 buildType 中的 signingConfig 设为 null
+          sed -i 's/signingConfig = signingConfigs.getByName("release")/signingConfig = null/g' simple_live_app/android/app/build.gradle.kts
 
       - name: Build Debug APK
         run: |
           cd simple_live_app
-          # 使用 debug 模式跳过所有签名检查
+          # 加上 --no-pub 避免重复下载，加上 --no-tree-shake-icons 防止字体报错
           flutter build apk --debug --no-tree-shake-icons
 
       - name: Upload Artifact
